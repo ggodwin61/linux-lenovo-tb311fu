@@ -1,0 +1,21 @@
+{
+  "files.watcherExclude": {
+    "**/build/**": true,
+    "**/dist/**": true,
+    "**/downloads/**": true,
+    "**/vendor-input/**": true,
+    "**/local/**": true
+  },
+  "search.exclude": {
+    "build": true,
+    "dist": true,
+    "downloads": true,
+    "vendor-input": true,
+    "local": true
+  },
+  "files.associations": {
+    "tb311fu_defconfig": "properties"
+  },
+  "editor.insertSpaces": true,
+  "editor.trimAutoWhitespace": true
+}

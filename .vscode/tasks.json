@@ -1,0 +1,50 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build userspace helpers",
+      "type": "process",
+      "command": "bash",
+      "args": ["${workspaceFolder}/scripts/build-userspace"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "Build kernel",
+      "type": "process",
+      "command": "bash",
+      "args": ["${workspaceFolder}/scripts/build-kernel"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "build",
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "Build device modules",
+      "type": "process",
+      "command": "bash",
+      "args": ["${workspaceFolder}/scripts/build-modules", "gpu", "bluetooth", "scanout", "waydroid"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "build",
+      "problemMatcher": ["$gcc"]
+    },
+    {
+      "label": "Check display driver profile",
+      "type": "process",
+      "command": "python3",
+      "args": ["${workspaceFolder}/scripts/check-display-driver.py"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Check vendor module ABI",
+      "type": "process",
+      "command": "python3",
+      "args": ["${workspaceFolder}/scripts/check-vendor-abi.py", "build/kernel", "--report", "build/abi.json"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "test",
+      "problemMatcher": []
+    }
+  ]
+}

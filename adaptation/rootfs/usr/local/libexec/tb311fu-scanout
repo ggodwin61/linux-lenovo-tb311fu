@@ -10,14 +10,19 @@ start() {
  ebegin "Enabling TB311FU native scanout"
  [ "$(uname -r)" = 6.6.142-pmos-minimal+ ] || return 1
  local module=/lib/modules/$(uname -r)/extra/mediatek/mediatek-drm.ko
- local expected=39df257c51fc9f5f44c83939281df6676c13d6aab348549ca7d997d02e159ff2
- if [ "$(sha256sum "$module" | cut -d' ' -f1)" != "$expected" ]; then
-  eerror "Unsupported MediaTek DRM input; retaining userspace fallback"
-  return 1
- fi
+ local expected_note input
+ input=$(sha256sum "$module" | cut -d' ' -f1) || return 1
+ case "$input" in
+  39df257c51fc9f5f44c83939281df6676c13d6aab348549ca7d997d02e159ff2)
+   expected_note=cf6bea0d309e2d3fbe4a93c229164f0907231845cee0d2c628734e4677584839 ;;
+  ca2f33ad438c9fc4f6ad6b439d31bda96b36e1c44f1294f8e1234d8a8e5240dd)
+   expected_note=6fdc3c39c576e8b8ac7f9d3a4d888c76bb22740d8f5fc56d5c909d2e153fd126
+   einfo "ZUI 17.5.36.508 scanout profile: static checks passed; hardware validation pending" ;;
+  *) eerror "Unsupported MediaTek DRM input; retaining userspace fallback"; return 1 ;;
+ esac
  # Also identify the driver actually loaded from the early-boot image.
  local note=/sys/module/mediatek_drm/notes/.note.gnu.build-id
- if [ "$(sha256sum "$note" | cut -d' ' -f1)" != "cf6bea0d309e2d3fbe4a93c229164f0907231845cee0d2c628734e4677584839" ]; then
+ if [ "$(sha256sum "$note" | cut -d' ' -f1)" != "$expected_note" ]; then
   eerror "Loaded MediaTek DRM does not match the validated input"
   return 1
  fi

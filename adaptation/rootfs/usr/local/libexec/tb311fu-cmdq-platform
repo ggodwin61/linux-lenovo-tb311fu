@@ -13,12 +13,26 @@ start() {
  local release=6.6.142-pmos-minimal+
  local modules=/lib/modules/$release/extra/mediatek
  [ "$(uname -r)" = "$release" ] || { eerror "Unsupported kernel; retaining current CMDQ fallback"; return 1; }
- [ "$(sha256sum "$modules/cmdq-platform-mt6768.ko" | cut -d' ' -f1)" = fd43a7e4ebdf2a5442ce16f9ccb350c0759d41299621eda4ccb83abc47677825 ] || { eerror "Unsupported CMDQ platform binary"; return 1; }
- [ "$(sha256sum "$modules/mtk-cmdq-drv-ext.ko" | cut -d' ' -f1)" = 2304d5842cd974e43c5b680bf5126d02e87d1f361b1f87eae48d8bad7bb387d6 ] || { eerror "Unsupported CMDQ controller binary"; return 1; }
+ local platform controller controller_note platform_note=
+ platform=$(sha256sum "$modules/cmdq-platform-mt6768.ko" | cut -d' ' -f1) || return 1
+ controller=$(sha256sum "$modules/mtk-cmdq-drv-ext.ko" | cut -d' ' -f1) || return 1
+ # Match a complete pair; mixing vendor releases is unsupported.
+ case "$platform:$controller" in
+  fd43a7e4ebdf2a5442ce16f9ccb350c0759d41299621eda4ccb83abc47677825:2304d5842cd974e43c5b680bf5126d02e87d1f361b1f87eae48d8bad7bb387d6)
+   controller_note=e3b027a47c6a4a59f510126fd040a4142bd16b093f99ea10a1381b56e1e1c30f ;;
+  ee417cd29c3f928e9fcd6fceac231f08ba5a5c210dbe6e22a467797aeea30a5a:12d9a40424f0c3e0b6549a77bced63333e5e73432e077421a8fafaa7d5a60242)
+   controller_note=f95b7e0b2a38f4ba6b2bb4009f822fb98d9bbb41abd566241297bcfdca2da1a0
+   platform_note=f986740349ce5618105dcbc6f2570f715458298784c974347b59052043fb0411
+   einfo "ZUI 17.5.36.508 CMDQ profile: static checks passed; hardware validation pending" ;;
+  *) eerror "Unsupported CMDQ binary pair"; return 1 ;;
+ esac
  modprobe mtk_cmdq_drv_ext || return 1
- [ "$(sha256sum /sys/module/mtk_cmdq_drv_ext/notes/.note.gnu.build-id | cut -d' ' -f1)" = e3b027a47c6a4a59f510126fd040a4142bd16b093f99ea10a1381b56e1e1c30f ] || { eerror "Loaded CMDQ controller differs from validated binary"; return 1; }
+ [ "$(sha256sum /sys/module/mtk_cmdq_drv_ext/notes/.note.gnu.build-id | cut -d' ' -f1)" = "$controller_note" ] || { eerror "Loaded CMDQ controller differs from selected binary"; return 1; }
  modprobe cmdq_platform_mt6768 || return 1
  [ -d /sys/module/cmdq_platform_mt6768 ] || return 1
+ if [ -n "$platform_note" ]; then
+  [ "$(sha256sum /sys/module/cmdq_platform_mt6768/notes/.note.gnu.build-id | cut -d' ' -f1)" = "$platform_note" ] || { eerror "Loaded CMDQ platform differs from selected binary"; return 1; }
+ fi
  eend 0
 }
 

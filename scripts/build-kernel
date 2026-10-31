@@ -11,6 +11,5 @@ mkdir -p "$KERNEL_OUT"
 if [[ ! -f "$KERNEL_OUT/.config" ]]; then
     cp "$ROOT/kernel/configs/tb311fu_defconfig" "$KERNEL_OUT/.config"
 fi
-cp "$ROOT/kernel/abi/abi_symbollist.raw" "$KERNEL_OUT/abi_symbollist.raw"
 make -C "$KERNEL_SRC" O="$KERNEL_OUT" olddefconfig
 make -C "$KERNEL_SRC" O="$KERNEL_OUT" -j"${JOBS:-$(nproc)}" Image modules

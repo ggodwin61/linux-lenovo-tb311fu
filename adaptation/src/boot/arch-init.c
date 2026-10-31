@@ -6,9 +6,32 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
-static void fail(const char *s) { perror(s); sleep(10); execl("/bin/busybox","busybox","sh",NULL); for (;;) sleep(60); }
-static void bind(const char *a,const char *b) { if(mount(a,b,NULL,MS_BIND,NULL))fail(b); }
-int main(int argc,char **argv) {
+#include <limits.h>
+#include <string.h>
+#include <fcntl.h>
+static void __attribute__((noreturn)) fail(const char *s) {
+ int saved=errno, fd=open("/dev/kmsg",O_WRONLY|O_CLOEXEC);
+ if(fd>=0) { dprintf(fd,"TB311FU arch-init: %s: %s\n",s,strerror(saved)); close(fd); }
+ errno=saved; perror(s); sleep(10); execl("/bin/busybox","busybox","sh",NULL); for (;;) sleep(60);
+}
+static void bind(const char *a,const char *b) {
+ struct stat st;
+ if(stat(a,&st))fail(a);
+ if(S_ISDIR(st.st_mode)) {
+  char path[PATH_MAX];
+  if(strlen(b)>=sizeof(path)) { errno=ENAMETOOLONG; fail(b); }
+  strcpy(path,b);
+  for(char *p=path+1;;p++) {
+   if(*p=='/' || *p=='\0') {
+    char saved=*p; *p='\0';
+    if(mkdir(path,0755) && errno!=EEXIST)fail(path);
+    *p=saved; if(!saved)break;
+   }
+  }
+ }
+ if(mount(a,b,NULL,MS_BIND,NULL))fail(b);
+}
+int main(void) {
  if(getpid()!=1) { fprintf(stderr,"PID 1 only\n"); return 1; }
  if(access("/arch/usr/lib/systemd/systemd",X_OK))fail("Arch systemd missing");
  if(mount(NULL,"/",NULL,MS_REC|MS_PRIVATE,NULL))fail("private root");
@@ -27,5 +50,6 @@ int main(int argc,char **argv) {
  bind("/.device-root/var/lib/waydroid","/var/lib/waydroid");
  bind("/.device-root/etc/waydroid-extra","/etc/waydroid-extra");
  setenv("PATH","/usr/local/sbin:/usr/local/bin:/usr/bin",1);
+ setenv("SYSTEMD_LOG_TARGET","kmsg",1);
  execl("/usr/lib/systemd/systemd","/sbin/init",NULL);fail("systemd");
 }

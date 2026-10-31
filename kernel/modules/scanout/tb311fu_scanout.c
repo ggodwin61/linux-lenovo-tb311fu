@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
-/* TB311FU, vendor mediatek-drm 39df257c... on configured 6.6.142 only.
+/* TB311FU, exact vendor mediatek-drm profiles selected by tb311fu-scanout
+ * on configured 6.6.142 only. The ZUI 17.5.36.508 profile has static
+ * binary/ABI checks; on-device validation is still required.
  * Use normal DRM plane helper callbacks; no code patching or IRQ hooks.
  * Install/remove while the compositor is stopped. Restore original ownership
  * of format arrays/helpers before releasing the target DRM device.

@@ -31,6 +31,7 @@ Device kernel sources, hardware helpers and the Plasma Mobile profile are
 included here. Build scripts produce the kernel, modules and rootfs overlay.
 
 - [Build](docs/build.md)
+- [VS Code development](docs/development.md)
 - [Installation](docs/install.md)
 - [Project layout](docs/layout.md)
 - [Source migration](docs/migration.md)
