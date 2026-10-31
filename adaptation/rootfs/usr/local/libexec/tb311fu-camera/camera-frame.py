@@ -25,6 +25,14 @@ feature = api['feature']
 CamBuffer = api['CamBuffer']
 load = api['load']
 
+# Sensor identity, preview geometry, and Bayer order verified against the
+# matching vendor driver's get_info/get_resolution routines.
+SENSOR_PROFILES = {
+    (1, 3, 0x5a2): ('GRBG', 1296, 972),
+    (0, 1, 0x8a8): ('RGGB', 1632, 1224),
+    (0, 0, 0xd154): ('BGGR', 1632, 1224),
+}
+
 
 class Registers:
     def __init__(self, fd, base, size):
@@ -66,35 +74,34 @@ def main():
         raise SystemExit('Requires the verified tablet kernel and root')
     lock = open('/run/lock/tb311fu-gpu-video', 'a')
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    modules = {
-        'mdp_drv_mt6768': 'ba808663704a3943535bf1d89c14526b7c8285584ebc6dcfaaeeeb3a387202a0',
-        'imgsensor_isp4_t': '32b9d78f02d4dc943e903d72c4112c13455fdd8790c20d0e6fcc479526c329bc',
-        'camera_isp_4_t': 'ee672f62fbc9672be42be489cff56d70e9e1ac1708f8c84ed45234b3821d6c1c',
-        'camera_mem': '7985c7419f9c9234a7e0c13f15334585ef974f766e3a8cc8ad9233a68a86ddea',
-    }
-    directory = Path('/lib/modules') / os.uname().release / 'extra/mediatek'
-    for name, expected in modules.items():
-        if hashlib.sha256((directory / (name + '.ko')).read_bytes()).hexdigest() != expected:
-            raise RuntimeError(f'Unverified camera module: {name}')
+    api['require_capture_memory']()
+    modules = api['verify_modules']()
     for name in modules:
         load(name)
+    api['verify_modules']()
     sensor = os.open('/dev/kd_camera_hw', os.O_RDWR | os.O_CLOEXEC)
     isp = cm = dma = -1
     regs = []
     blocks = ()
     node = None
     opened = False
+    streaming = False
+    test_pattern = False
     s = p = v = image = None
     try:
         camera = args.camera
         index = int.from_bytes(feature(sensor, camera, 0xc23), 'little', signed=True)
-        if index != (1 if camera == 0 else 3):
-            raise RuntimeError(f'This profile needs GC08A8 LCE, got index {index}')
+        if index not in ({0, 1} if camera == 0 else {3}):
+            raise RuntimeError(f'Unsupported camera driver index: {index}')
         feature(sensor, camera, 0xc21)
         opened = True
         sensor_id = int.from_bytes(feature(sensor, camera, 0xbe1), 'little')
-        if sensor_id != (0x8a8 if camera == 0 else 0x5a2):
+        profile = SENSOR_PROFILES.get((camera, index, sensor_id))
+        if profile is None:
             raise RuntimeError(f'Unexpected sensor ID {sensor_id:x}')
+        bayer, w, h = profile
+        if args.color_bars and sensor_id != 0x5a2:
+            raise RuntimeError('Only the GC05A2 color-bar test pattern has been verified')
         isp = os.open('/dev/camera-isp', os.O_RDWR | os.O_CLOEXEC)
         s = Registers(isp, 0x1a040000, 0x8000)
         p = Registers(isp, 0x11c10000, 0x6000)
@@ -129,7 +136,6 @@ def main():
         image = mmap.mmap(dma, 8 << 20, flags=mmap.MAP_SHARED,
                           prot=mmap.PROT_READ | mmap.PROT_WRITE)
         image[:] = b'\xa5' * (8 << 20)
-        w, h = (1632, 1224) if camera == 0 else (1296, 972)
         packed_width = w * 10 // 8
         bpl = ((packed_width + 15) // 16) * 16
 
@@ -205,15 +211,25 @@ def main():
         fcntl.ioctl(sensor, 0xc0186914, struct.pack('IIQQ', camera, 0, 0, 0))
         if args.color_bars:
             feature(sensor, camera, 0xbe3, 16, struct.pack('QQ', 1, 0))
+            test_pattern = True
+            if sensor_id == 0x5a2:
+                # The vendor feature selects solid black (008d=00). GC05A2's
+                # documented test selector 0x10 produces actual color bars.
+                feature(sensor, camera, 0xbc3, 8, struct.pack('II', 0x008d, 0x10))
         feature(sensor, camera, 3006, 8, struct.pack('Q', 1024))
         feature(sensor, camera, 3004, 8, struct.pack('Q', 2000))
+        if sensor_id == 0xd154:
+            # SC820CS preview setup leaves streaming disabled. The exact
+            # driver's feature table maps 0xc20 to streaming_control(true).
+            feature(sensor, camera, 0xc20, 8, struct.pack('Q', 0))
+            streaming = True
         print('sensor registers', {hex(a): feature(sensor, camera, 0xbc4, 8, struct.pack('II', a, 0)).hex()
                                   for a in (0x0100, 0x0112, 0x0113, 0x0114, 0x034c, 0x034d, 0x034e, 0x034f)}, file=sys.stderr, flush=True)
         if args.preview:
             import numpy as np
+            colors = runpy.run_path(str(Path(__file__).with_name('camera-color.py')))
             emitted = 0
             start = time.monotonic()
-            gamma = np.uint8([(v / 255) ** .45 * 255 for v in range(256)])
             while not args.frames or emitted < args.frames:
                 time.sleep(0.04)
                 transport = np.frombuffer(image[:bpl*h], dtype=np.uint8).reshape(h, bpl)
@@ -221,16 +237,8 @@ def main():
                     if time.monotonic() - start > 3:
                         raise RuntimeError('No image received from the sensor')
                     continue
-                # CSI-2 RAW10 packets are transported byte-for-byte by this profile.
-                raw = transport[:, :packed_width].reshape(h, w // 4, 5)[:, :, :4].reshape(h, w).astype(np.float32)
-                # Both GC sensors use an RGGB colour filter in this orientation.
-                r, g1, g2, blue = raw[0::2, 0::2], raw[0::2, 1::2], raw[1::2, 0::2], raw[1::2, 1::2]
-                rgb = np.stack((r, (g1 + g2) * .5, blue), axis=-1)
-                rgb = np.maximum(rgb - 16, 0)
-                means = np.mean(rgb, axis=(0, 1)) + .5
-                rgb *= np.clip(np.mean(means) / means, .5, 2.5)
-                level = max(float(np.percentile(rgb[::8, ::8], 98)), 8)
-                rgb = gamma[np.uint8(np.clip(rgb / level, 0, 1) * 255)]
+                rgb = colors['decode_raw10'](image[:bpl*h], w, h, bpl, bayer)
+                rgb = colors['render_preview'](rgb)
                 ppm = f'P6\n{w//2} {h//2}\n255\n'.encode() + rgb.tobytes()
                 sys.stdout.buffer.write(struct.pack('I', len(ppm)))
                 sys.stdout.buffer.write(ppm)
@@ -262,6 +270,11 @@ def main():
         args.output.write_bytes(pixels)
         args.output.with_suffix('.json').write_text(json.dumps({'width': w, 'height': h, 'stride': bpl, 'format': 'CSI2-RAW10-MIPI', **diagnostics}, indent=2))
     finally:
+        if streaming:
+            try:
+                feature(sensor, camera, 0xc1f, 8, struct.pack('Q', 0))
+            except OSError as error:
+                print(f'Could not suspend camera stream: {error}', file=sys.stderr)
         if v is not None:
             v.write(0x504, 0)
             v.write(0x500, 0)
@@ -273,6 +286,8 @@ def main():
             v.write(0x20, 0)
             v.write(0x30, 0)
         if opened:
+            if test_pattern:
+                feature(sensor, camera, 0xbe3, 16, struct.pack('QQ', 0, 0))
             feature(sensor, camera, 0xc22)
         if s is not None:
             s.write(0x200, 0)

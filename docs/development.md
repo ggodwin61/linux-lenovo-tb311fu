@@ -6,7 +6,8 @@ Generated images, firmware inputs, downloads, and local connection settings
 are excluded from searches and file watching.
 
 Use **Terminal → Run Task** for kernel, module, and userspace builds or the
-vendor ABI and display-profile checks. **Ctrl+Shift+B** builds userspace
+vendor ABI, display-profile, and camera color checks. The camera checks
+require Python NumPy and run without accessing a camera. **Ctrl+Shift+B** builds userspace
 helpers. Kernel tasks use the toolchain paths documented in [Build](build.md);
 `KERNEL_SRC`, `CLANG_BIN`, and `KERNEL_OUT` can override their defaults.
 

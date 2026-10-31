@@ -26,7 +26,8 @@ out = a.output.resolve()
 if out.exists():
     p.error('Choose a new output directory')
 for src in (ROOT / 'adaptation/rootfs', ROOT / 'profiles/plasma-mobile/rootfs'):
-    shutil.copytree(src, out, dirs_exist_ok=True)
+    shutil.copytree(src, out, dirs_exist_ok=True,
+                    ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
 values = {'USER': a.user, 'GROUP': group, 'UID': str(a.uid), 'HOME': home}
 for path in out.rglob('*'):
     if path.is_file():
@@ -34,6 +35,8 @@ for path in out.rglob('*'):
         for key, value in values.items():
             text = text.replace(f'@{key}@', value)
         path.write_text(text)
+        if path.parent == out / 'etc/sudoers.d':
+            path.chmod(0o440)
 config = out / home.lstrip('/') / '.config'
 shutil.copytree(ROOT / 'profiles/plasma-mobile/user-config', config, dirs_exist_ok=True)
 print(f'Rootfs: {out}')

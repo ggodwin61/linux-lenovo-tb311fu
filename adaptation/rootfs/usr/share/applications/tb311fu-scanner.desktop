@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Document Scanner
+Comment=Capture camera pages and save a multi-page PDF
+Exec=python3 /usr/local/libexec/tb311fu-camera/scanner-app.py
+Icon=scanner
+Terminal=false
+Categories=Graphics;Scanning;
+StartupNotify=true
+X-KDE-FormFactor=handset;tablet;desktop;

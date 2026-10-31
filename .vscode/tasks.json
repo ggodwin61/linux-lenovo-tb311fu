@@ -38,6 +38,15 @@
       "problemMatcher": []
     },
     {
+      "label": "Check camera color decoding",
+      "type": "process",
+      "command": "python3",
+      "args": ["${workspaceFolder}/scripts/check-camera.py"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
       "label": "Check vendor module ABI",
       "type": "process",
       "command": "python3",

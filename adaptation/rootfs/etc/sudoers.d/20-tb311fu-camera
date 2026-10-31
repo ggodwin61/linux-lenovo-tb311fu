@@ -1,0 +1,2 @@
+@USER@ ALL=(root) NOPASSWD: /usr/bin/python3 -I /usr/local/libexec/tb311fu-camera/camera-frame.py --camera 1 --preview
+@USER@ ALL=(root) NOPASSWD: /usr/bin/python3 -I /usr/local/libexec/tb311fu-camera/camera-frame.py --camera 0 --preview

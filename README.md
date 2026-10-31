@@ -12,10 +12,14 @@ Working:
 - Power and volume buttons
 - USB
 - Audio
-- Camera (low image quality)
+- Front/rear cameras and basic camera-to-PDF scanning (limited image quality)
 - Brightness control
 - Battery status and charging detection
 - Waydroid
+
+Camera support is experimental: autofocus is not implemented, and the basic
+PDF scanner exports lower-resolution images. See [camera support](docs/camera.md)
+for tested sensors and current limitations.
 
 ## Hardware
 
@@ -32,6 +36,7 @@ included here. Build scripts produce the kernel, modules and rootfs overlay.
 
 - [Build](docs/build.md)
 - [VS Code development](docs/development.md)
+- [Camera support and document scanning](docs/camera.md)
 - [Installation](docs/install.md)
 - [Project layout](docs/layout.md)
 - [Source migration](docs/migration.md)
